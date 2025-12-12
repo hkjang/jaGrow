@@ -18,6 +18,12 @@ import { IntegrationConnectDto, IntegrationPlatformDto } from '../dto/integratio
 export class IntegrationController {
   constructor(private integrationStatusService: IntegrationStatusService) {}
 
+  @Get()
+  @Roles('SUPER_ADMIN', 'ORG_ADMIN', 'AD_OPS')
+  async getIntegrations(@Query('tenantId') tenantId?: string) {
+    return this.integrationStatusService.getAll(tenantId);
+  }
+
   @Get('status')
   @Roles('SUPER_ADMIN', 'ORG_ADMIN', 'AD_OPS')
   async getAll(@Query('tenantId') tenantId?: string) {

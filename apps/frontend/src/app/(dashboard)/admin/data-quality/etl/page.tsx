@@ -4,12 +4,16 @@ import { useState, useEffect } from 'react';
 
 interface EtlJob {
   id: string;
-  tenantId: string;
-  jobType: string;
-  platform: string | null;
-  status: string;
-  processedCount: number;
-  errorMessage: string | null;
+  tenantId?: string;
+  jobName?: string;
+  jobType?: string;
+  scheduleType?: string;
+  platform?: string | null;
+  status?: string;
+  processedCount?: number;
+  retentionDays?: number;
+  isActive?: boolean;
+  errorMessage?: string | null;
   createdAt: string;
 }
 
@@ -115,16 +119,16 @@ export default function ETLPipelinePage() {
                 jobs.map((job) => (
                   <tr key={job.id} className="hover:bg-slate-800/50 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="text-white font-medium">{job.jobType}</div>
+                      <div className="text-white font-medium">{job.jobName || job.jobType || '-'}</div>
                     </td>
-                    <td className="px-6 py-4 text-slate-400">{job.platform || '-'}</td>
+                    <td className="px-6 py-4 text-slate-400">{job.scheduleType || job.platform || '-'}</td>
                     <td className="px-6 py-4 text-center">
-                      <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(job.status)}`}>
-                        {job.status}
+                      <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(job.status || (job.isActive ? 'active' : 'inactive'))}`}>
+                        {job.status || (job.isActive ? '활성' : '비활성')}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right text-white">
-                      {job.processedCount.toLocaleString()}
+                      {job.processedCount?.toLocaleString() ?? job.retentionDays ?? '-'}
                     </td>
                     <td className="px-6 py-4 text-center text-slate-400">
                       {new Date(job.createdAt).toLocaleDateString()}

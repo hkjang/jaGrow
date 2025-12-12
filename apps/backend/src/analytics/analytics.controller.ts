@@ -23,4 +23,13 @@ export class AnalyticsController {
       take: 50
     });
   }
+
+  @Get('anomalies')
+  async getAnomalies(@Query('severity') severity?: string) {
+    return this.prisma.anomalyAlert.findMany({
+      where: severity ? { severity } : {},
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    });
+  }
 }
