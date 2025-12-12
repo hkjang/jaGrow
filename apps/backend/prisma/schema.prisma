@@ -1,0 +1,1025 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  adAccounts AdAccount[]
+}
+
+model User {
+  id             String       @id @default(uuid())
+  email          String       @unique
+  password       String
+  name           String?
+  role           Role         @default(VIEWER)
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  assignments    Assignment[]
+  events         Event[]
+  attributionEvents AttributionEvent[]
+}
+
+enum ExperimentStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  ENDED
+}
+
+model Experiment {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  status      ExperimentStatus @default(DRAFT)
+  salt        String   @default(uuid()) // For deterministic hashing
+  trafficAllocation Int @default(100) // 0-100 percentage
+  
+  variations  Variation[]
+  assignments Assignment[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Variation {
+  id           String     @id @default(uuid())
+  experimentId String
+  experiment   Experiment @relation(fields: [experimentId], references: [id])
+  
+  name         String
+  key          String     // e.g. 'control', 'variant-a'
+  weight       Int        @default(50) // Relative weight
+  config       Json?      // JSON configuration for this variation
+  
+  assignments  Assignment[]
+  
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Assignment {
+  id           String     @id @default(uuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  
+  experimentId String
+  experiment   Experiment @relation(fields: [experimentId], references: [id])
+  
+  variationId  String
+  variation    Variation  @relation(fields: [variationId], references: [id])
+  
+  timestamp    DateTime   @default(now())
+  
+  @@unique([userId, experimentId]) // One assignment per user per experiment
+}
+
+model Event {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  eventName   String
+  properties  Json?
+  
+  timestamp   DateTime @default(now())
+}
+
+enum AdPlatform {
+  GOOGLE
+  META
+  TIKTOK
+}
+
+model AdAccount {
+  id             String     @id @default(uuid())
+  platform       AdPlatform
+  accountId      String     // External Platform Account ID
+  name           String
+  accessToken    String
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  isActive       Boolean    @default(true)
+  
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+
+  campaigns      AdCampaign[]
+  
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([platform, accountId])
+}
+
+model AdCampaign {
+  id             String     @id @default(uuid())
+  adAccountId    String
+  adAccount      AdAccount  @relation(fields: [adAccountId], references: [id])
+  
+  externalId     String     // ID from the platform
+  name           String
+  status         String
+  budget         Float?
+  currency       String?
+  
+  adGroups       AdGroup[]
+  metrics        AdMetric[]
+  predictions    PerformancePrediction[]
+  
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([adAccountId, externalId])
+}
+
+model AdGroup {
+  id             String     @id @default(uuid())
+  campaignId     String
+  campaign       AdCampaign @relation(fields: [campaignId], references: [id])
+  
+  externalId     String
+  name           String
+  status         String
+  
+  ads            Ad[]
+  metrics        AdMetric[]
+  
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([campaignId, externalId])
+}
+
+model Ad {
+  id             String     @id @default(uuid())
+  adGroupId      String
+  adGroup        AdGroup    @relation(fields: [adGroupId], references: [id])
+  
+  externalId     String
+  name           String
+  status         String
+  creativeUrl    String?    // URL to image/video
+  landingPageUrl String?
+  
+  metrics        AdMetric[]
+  
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([adGroupId, externalId])
+}
+
+model AdMetric {
+  id             String     @id @default(uuid())
+  
+  // Dynamic linking: typically one of these is set, but can be aggregated
+  campaignId     String?
+  campaign       AdCampaign? @relation(fields: [campaignId], references: [id])
+  adGroupId      String?
+  adGroup        AdGroup?    @relation(fields: [adGroupId], references: [id])
+  adId           String?
+  ad             Ad?         @relation(fields: [adId], references: [id])
+  
+  date           DateTime   @db.Date
+  
+  impressions    Int        @default(0)
+  clicks         Int        @default(0)
+  spend          Float      @default(0)
+  conversions    Int        @default(0)
+  conversionValue Float     @default(0)
+  
+  roas           Float?
+  ctr            Float?
+  cpc            Float?
+  cpm            Float?
+  
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([date])
+}
+
+model AttributionEvent {
+  id             String     @id @default(uuid())
+  userId         String?
+  user           User?      @relation(fields: [userId], references: [id])
+  
+  source         String?    // utm_source
+  medium         String?    // utm_medium
+  campaign       String?    // utm_campaign
+  content        String?    // utm_content
+  term           String?    // utm_term
+  
+  gclid          String?    // Google Click ID
+  fbp            String?    // Facebook Browser ID
+  fbc            String?    // Facebook Click ID
+  ttclid         String?    // TikTok Click ID
+  
+  timestamp      DateTime   @default(now())
+}
+
+// ============================================
+// Phase 1: 데이터·분석 고도화 - 멀티터치 어트리뷰션
+// ============================================
+
+model UserJourney {
+  id              String       @id @default(uuid())
+  userId          String
+  sessionId       String?
+  touchpoints     TouchPoint[]
+  conversionValue Float?
+  convertedAt     DateTime?
+  attributionModel String?     // "last_touch", "first_touch", "linear", "time_decay", "data_driven"
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([convertedAt])
+}
+
+model TouchPoint {
+  id                String      @id @default(uuid())
+  journeyId         String
+  journey           UserJourney @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  channel           String      // "google", "meta", "tiktok", "organic", "direct"
+  source            String?
+  medium            String?
+  campaign          String?
+  adGroup           String?
+  adId              String?
+  clickId           String?     // gclid, fbp, fbc, ttclid
+  clickIdType       String?     // "gclid", "fbp", "fbc", "ttclid"
+  timestamp         DateTime    @default(now())
+  order             Int
+  attributionWeight Float?      // 어트리뷰션 가중치 (0.0 ~ 1.0)
+  
+  @@index([journeyId])
+  @@index([clickId])
+}
+
+// ============================================
+// Phase 1: 예측 분석
+// ============================================
+
+model PerformancePrediction {
+  id                 String      @id @default(uuid())
+  campaignId         String?
+  campaign           AdCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  adAccountId        String?
+  predictionType     String      // "7day", "30day"
+  predictedROAS      Float
+  predictedSpend     Float
+  predictedRevenue   Float
+  predictedConversions Int
+  predictedCTR       Float?
+  predictedCPC       Float?
+  confidenceScore    Float       // 0.0 ~ 1.0
+  modelVersion       String?
+  createdAt          DateTime    @default(now())
+
+  @@index([campaignId])
+  @@index([createdAt])
+}
+
+model SeasonalProfile {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  dayOfWeek       Int[]    // 0-6 (Sunday-Saturday)
+  hourOfDay       Int[]    // 0-23
+  monthOfYear     Int[]    // 1-12
+  multiplier      Float    // 예상 성과 배수
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ============================================
+// Phase 1: 실시간 이상 탐지
+// ============================================
+
+model AnomalyAlert {
+  id              String   @id @default(uuid())
+  campaignId      String?
+  adAccountId     String?
+  metricType      String   // "ctr", "roas", "conversion_rate", "spend", "cpc"
+  alertType       String   // "spike", "drop", "threshold_breach"
+  currentValue    Float
+  expectedValue   Float
+  threshold       Float
+  deviation       Float    // Z-score 또는 백분율 변화
+  severity        String   // "low", "medium", "high", "critical"
+  message         String?
+  isResolved      Boolean  @default(false)
+  resolvedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([campaignId])
+  @@index([createdAt])
+  @@index([isResolved])
+}
+
+// ============================================
+// Phase 2: 자동 최적화·운영
+// ============================================
+
+model OptimizationRule {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  ruleType        String   // "pause_low_performer", "increase_budget", "decrease_budget", "expand_creative"
+  conditions      Json     // 조건 배열 [{metric, operator, value}]
+  actions         Json     // 액션 배열 [{type, params}]
+  priority        Int      @default(0)
+  isActive        Boolean  @default(true)
+  lastTriggeredAt DateTime?
+  triggerCount    Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model OptimizationLog {
+  id              String   @id @default(uuid())
+  ruleId          String?
+  campaignId      String?
+  adGroupId       String?
+  adId            String?
+  action          String   // "paused", "budget_increased", "budget_decreased"
+  previousValue   String?
+  newValue        String?
+  reason          String?
+  success         Boolean  @default(true)
+  errorMessage    String?
+  createdAt       DateTime @default(now())
+
+  @@index([ruleId])
+  @@index([campaignId])
+  @@index([createdAt])
+}
+
+// ============================================
+// Phase 2: 예산 자동 조정
+// ============================================
+
+model BudgetAllocation {
+  id              String   @id @default(uuid())
+  adAccountId     String
+  campaignId      String?
+  period          String   // "daily", "weekly", "monthly"
+  targetROAS      Float?
+  targetCPA       Float?
+  currentBudget   Float
+  recommendedBudget Float?
+  minBudget       Float?
+  maxBudget       Float?
+  allocationScore Float?   // iROAS 기반 점수
+  isAutoApply     Boolean  @default(false)
+  lastUpdatedAt   DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  @@index([adAccountId])
+  @@index([campaignId])
+}
+
+// ============================================
+// Phase 5: 알림 시스템
+// ============================================
+
+enum NotificationType {
+  ROAS_DROP
+  CONVERSION_DROP
+  BUDGET_DEPLETED
+  ANOMALY_DETECTED
+  OPTIMIZATION_APPLIED
+  TRACKING_LOSS
+  CLICK_ID_MISMATCH
+}
+
+enum NotificationChannel {
+  EMAIL
+  SLACK
+  WEBHOOK
+  IN_APP
+}
+
+model NotificationPreference {
+  id              String   @id @default(uuid())
+  userId          String
+  notificationType NotificationType
+  channel         NotificationChannel
+  isEnabled       Boolean  @default(true)
+  threshold       Float?   // 알림 임계치
+  webhookUrl      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, notificationType, channel])
+}
+
+model NotificationLog {
+  id              String   @id @default(uuid())
+  userId          String?
+  notificationType NotificationType
+  channel         NotificationChannel
+  title           String
+  message         String
+  metadata        Json?
+  isRead          Boolean  @default(false)
+  sentAt          DateTime @default(now())
+
+  @@index([userId])
+  @@index([sentAt])
+}
+
+// ============================================
+// Admin System - Core Models
+// ============================================
+
+model Tenant {
+  id              String   @id @default(uuid())
+  name            String
+  orgId           String
+  plan            String   @default("free") // "free", "pro", "enterprise"
+  apiKey          String   @unique @default(uuid())
+  eventsCount     BigInt   @default(0)
+  storageBytes    BigInt   @default(0)
+  costEstimate    Float    @default(0)
+  p95ResponseMs   Float?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  integrationStatuses IntegrationStatus[]
+  auditLogs           AuditLog[]
+  costQuotas          CostQuota[]
+  schemaRegistries    SchemaRegistry[]
+  piiRedactionJobs    PiiRedactionJob[]
+  etlJobs             EtlJob[]
+}
+
+enum AdminRoleType {
+  SUPER_ADMIN
+  ORG_ADMIN
+  DATA_OPS
+  AD_OPS
+  PRODUCT_OWNER
+  AUDITOR
+}
+
+model AdminRole {
+  id          String        @id @default(uuid())
+  userId      String
+  roleType    AdminRoleType
+  permissions Permission[]
+  grantedAt   DateTime      @default(now())
+  expiresAt   DateTime?     // JIT 권한용
+  grantedBy   String?
+  isActive    Boolean       @default(true)
+
+  @@unique([userId, roleType])
+  @@index([userId])
+}
+
+model Permission {
+  id          String    @id @default(uuid())
+  roleId      String
+  role        AdminRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  resource    String    // "tenant", "experiment", "rule", "integration", "audit"
+  action      String    // "create", "read", "update", "delete", "approve"
+  scope       String?   // 특정 ID 또는 "*" for all
+  createdAt   DateTime  @default(now())
+
+  @@index([roleId])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  userId      String
+  userEmail   String?
+  action      String   // "create", "update", "delete", "approve", "reject"
+  resource    String   // "experiment", "rule", "integration", "user"
+  resourceId  String?
+  oldValue    Json?
+  newValue    Json?
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([action])
+  @@index([timestamp])
+}
+
+enum IntegrationPlatform {
+  GOOGLE
+  META
+  TIKTOK
+  NAVER
+  KAKAO
+}
+
+model IntegrationStatus {
+  id                 String              @id @default(uuid())
+  tenantId           String
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  platform           IntegrationPlatform
+  accountId          String
+  tokenStatus        String              // "valid", "expiring", "expired", "revoked"
+  tokenExpiresAt     DateTime?
+  lastSyncAt         DateTime?
+  lastSuccessAt      DateTime?
+  lastErrorAt        DateTime?
+  lastErrorMessage   String?
+  permissionScope    String[]
+  rateLimitRemaining Int?
+  rateLimitResetAt   DateTime?
+  apiErrorRate       Float               @default(0)
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@unique([tenantId, platform, accountId])
+  @@index([tenantId])
+  @@index([platform])
+}
+
+model ExperimentApproval {
+  id            String    @id @default(uuid())
+  experimentId  String
+  version       Int       @default(1)
+  specSnapshot  Json      // 실험 스펙 스냅샷
+  status        String    @default("pending") // "pending", "approved", "rejected"
+  reviewerId    String?
+  reviewerEmail String?
+  comment       String?
+  requestedAt   DateTime  @default(now())
+  reviewedAt    DateTime?
+
+  @@index([experimentId])
+  @@index([status])
+}
+
+model SecurityAlert {
+  id           String    @id @default(uuid())
+  alertType    String    // "abnormal_access", "token_expired", "pii_detected"
+  severity     String    // "low", "medium", "high", "critical"
+  source       String
+  description  String
+  metadata     Json?
+  isResolved   Boolean   @default(false)
+  resolvedAt   DateTime?
+  resolvedBy   String?
+  createdAt    DateTime  @default(now())
+
+  @@index([alertType])
+  @@index([severity])
+  @@index([createdAt])
+}
+
+model PiiRedactionJob {
+  id             String    @id @default(uuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id])
+  fields         String[]
+  retentionDays  Int       @default(30)
+  status         String    @default("pending") // "pending", "running", "completed", "failed"
+  processedCount Int       @default(0)
+  errorMessage   String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+model CostQuota {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  quotaType       String   // "events", "storage", "query", "api_calls"
+  limitValue      BigInt
+  currentValue    BigInt   @default(0)
+  alertThreshold  Float    @default(0.8) // 80%에서 알림
+  period          String   @default("monthly") // "daily", "monthly"
+  periodStartAt   DateTime @default(now())
+  isAutoBlock     Boolean  @default(false) // 초과 시 자동 차단
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, quotaType, period])
+  @@index([tenantId])
+}
+
+model SchemaRegistry {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  eventName    String
+  version      Int      @default(1)
+  schema       Json     // JSON Schema
+  isRequired   Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([tenantId, eventName, version])
+  @@index([tenantId])
+}
+
+model EtlJob {
+  id              String    @id @default(uuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  jobType         String    // "sync", "backfill", "replay"
+  platform        String?
+  status          String    @default("pending") // "pending", "running", "completed", "failed"
+  config          Json?
+  startAt         DateTime?
+  endAt           DateTime?
+  processedCount  Int       @default(0)
+  errorMessage    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+// ==========================================
+// Settings Module 1: AI Model Settings
+// ==========================================
+
+model AIModelConfig {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  modelType       String   // "prediction", "copywriting", "image_generation"
+  modelVersion    String
+  provider        String   // "openai", "anthropic", "custom", "vllm", "ollama"
+  baseUrl         String?  // Custom endpoint URL for vLLM, Ollama, etc.
+  apiKey          String?  // API key for custom providers
+  isActive        Boolean  @default(true)
+  config          Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  parameters      AIModelParameter[]
+  validations     AIModelValidation[]
+}
+
+model AIModelParameter {
+  id              String   @id @default(uuid())
+  modelConfigId   String
+  modelConfig     AIModelConfig @relation(fields: [modelConfigId], references: [id], onDelete: Cascade)
+  paramName       String   // "tone", "style", "length", "imageSize", "quality"
+  paramValue      String
+  paramType       String   // "string", "number", "boolean", "json"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([modelConfigId, paramName])
+}
+
+model AIModelValidation {
+  id              String   @id @default(uuid())
+  modelConfigId   String
+  modelConfig     AIModelConfig @relation(fields: [modelConfigId], references: [id], onDelete: Cascade)
+  accuracy        Float?
+  regressionError Float?
+  trainedAt       DateTime?
+  validatedAt     DateTime @default(now())
+  metrics         Json?
+  createdAt       DateTime @default(now())
+}
+
+model AIModelSafety {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  ruleType        String   // "forbidden_word", "brand_guideline", "ad_policy"
+  ruleValue       String
+  isActive        Boolean  @default(true)
+  priority        Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ==========================================
+// Settings Module 2: Ad Platform Settings
+// ==========================================
+
+model PlatformConfig {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  platform        AdPlatform
+  authConfig      Json
+  tokenAutoRefresh Boolean @default(true)
+  refreshInterval Int      @default(3600)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  trackingConfigs TrackingConfig[]
+}
+
+model TrackingConfig {
+  id              String   @id @default(uuid())
+  platformConfigId String
+  platformConfig  PlatformConfig @relation(fields: [platformConfigId], references: [id], onDelete: Cascade)
+  eventType       String   // "capi", "s2s", "client"
+  isEnabled       Boolean  @default(true)
+  clickIdMatching Boolean  @default(true)
+  conversionPriority Int   @default(1)
+  config          Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model BudgetConfig {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  budgetType      String   // "daily", "weekly", "monthly"
+  defaultAmount   Float
+  currency        String   @default("KRW")
+  autoStopEnabled Boolean  @default(false)
+  autoStopKpi     String?  // "roas", "cpa", "ctr"
+  autoStopThreshold Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ==========================================
+// Settings Module 3: Conversion & Attribution
+// ==========================================
+
+model ConversionRule {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  name            String
+  eventType       String   // "purchase", "add_to_cart", "signup", "lead"
+  conversionValue Float?
+  deduplicationRule String? // "first", "last", "all"
+  lookbackWindow  Int      @default(30)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model AttributionModelConfig {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  modelType       String   // "last_touch", "first_touch", "linear", "time_decay", "data_driven"
+  isDefault       Boolean  @default(false)
+  config          Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model FunnelWeight {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  funnelStep      String   // "awareness", "consideration", "conversion"
+  weight          Float
+  autoOptimize    Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ==========================================
+// Settings Module 4: Experiment Settings
+// ==========================================
+
+model ExperimentTemplate {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  name            String
+  templateType    String   // "ad", "landing"
+  defaultConfig   Json
+  autoEndCriteria Json?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ExperimentAutoConfig {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  winnerKpi       String   // "conversion_rate", "roas", "ctr"
+  minSampleSize   Int      @default(1000)
+  autoApply       Boolean  @default(false)
+  autoRollback    Boolean  @default(true)
+  rollbackThreshold Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model StatisticalConfig {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  confidenceLevel Float    @default(0.95)
+  method          String   @default("frequentist") // "frequentist", "bayesian"
+  priorConfig     Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ==========================================
+// Settings Module 5: Segment & Audience
+// ==========================================
+
+model SegmentRule {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  name            String
+  ruleType        String   // "behavior", "time", "value"
+  conditions      Json
+  autoGenerate    Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model AudienceSync {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  platform        AdPlatform
+  audienceId      String
+  segmentRuleId   String?
+  syncEnabled     Boolean  @default(true)
+  syncFrequency   String   @default("daily") // "realtime", "hourly", "daily"
+  lastSyncAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ==========================================
+// Settings Module 6: ETL & Data Processing
+// ==========================================
+
+model EtlSchedule {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  jobName         String
+  scheduleType    String   // "batch", "stream"
+  cronExpression  String?
+  retentionDays   Int      @default(30)
+  isActive        Boolean  @default(true)
+  config          Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model DataQualityRule {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  ruleName        String
+  metricType      String   // "click_id_match_rate", "event_loss_rate"
+  threshold       Float
+  alertEnabled    Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model StoragePolicy {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  tableName       String
+  partitionBy     String   @default("date") // "date", "month", "year"
+  retentionYears  Int      @default(1)
+  compressAfterDays Int?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ==========================================
+// Settings Module 7: Report & Dashboard
+// ==========================================
+
+model KpiDefinition {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  name            String
+  kpiType         String   // "roas", "cac", "ltv", "conversion_rate"
+  formula         String?
+  defaultValue    Float?
+  displayUnit     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model DashboardTemplate {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  name            String
+  layout          Json
+  colorScheme     String   @default("light") // "light", "dark"
+  defaultWidgets  Json?
+  isDefault       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ReportSchedule {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  reportName      String
+  frequency       String   // "daily", "weekly", "realtime"
+  recipients      String[]
+  format          String   @default("pdf") // "pdf", "excel", "csv"
+  isActive        Boolean  @default(true)
+  lastSentAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ==========================================
+// Settings Module 8: Alert & Automation
+// ==========================================
+
+model AlertRule {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  name            String
+  alertType       String   // "budget_depleted", "conversion_drop", "tracking_loss", "winner_found"
+  conditions      Json
+  threshold       Float?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  channels        AlertChannelConfig[]
+}
+
+model AlertChannelConfig {
+  id              String   @id @default(uuid())
+  alertRuleId     String
+  alertRule       AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
+  channel         String   // "slack", "email", "webhook"
+  config          Json
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model AutomationRule {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  name            String
+  ruleType        String   // "campaign_pause", "budget_increase", "budget_decrease", "kpi_switch"
+  triggerConditions Json
+  actions         Json
+  isActive        Boolean  @default(true)
+  lastTriggeredAt DateTime?
+  triggerCount    Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ==========================================
+// Settings Module 9: Security & Access
+// ==========================================
+
+model AccessPolicy {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  policyType      String   // "ip_whitelist", "ip_blacklist"
+  ipRange         String
+  description     String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ApiKeyConfig {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  keyName         String
+  apiKey          String   @unique @default(uuid())
+  permissions     String[]
+  expiresAt       DateTime?
+  lastUsedAt      DateTime?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

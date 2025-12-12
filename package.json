@@ -1,0 +1,38 @@
+{
+  "name": "jagrow-monorepo",
+  "description": "Enterprise Growth Hacking Management Service",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "setup": "cd apps/backend && npm install && cd ../frontend && npm install",
+    "dev": "cd apps/backend && npm run start:dev",
+    "dev:frontend": "cd apps/frontend && npm run dev",
+    "dev:backend": "cd apps/backend && npm run start:dev",
+    "dev:all": "start cmd /c \"cd apps/backend && npm run start:dev\" && start cmd /c \"cd apps/frontend && npm run dev\"",
+    "stop": "docker-compose down",
+    "build": "cd apps/backend && npm run build && cd ../frontend && npm run build",
+    "build:backend": "cd apps/backend && npm run build",
+    "build:frontend": "cd apps/frontend && npm run build",
+    "lint": "cd apps/backend && npm run lint && cd ../frontend && npm run lint",
+    "lint:backend": "cd apps/backend && npm run lint",
+    "lint:frontend": "cd apps/frontend && npm run lint",
+    "test": "cd apps/backend && npm run test",
+    "test:unit": "cd apps/backend && npm run test",
+    "test:e2e": "cd apps/backend && npm run test:e2e",
+    "test:cov": "cd apps/backend && npm run test:cov",
+    "db:migrate": "cd apps/backend && npx prisma migrate dev",
+    "db:seed": "cd apps/backend && npx prisma db seed",
+    "db:reset": "cd apps/backend && npx prisma migrate reset --force",
+    "db:studio": "cd apps/backend && npx prisma studio",
+    "docker:prod": "docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@types/ioredis": "^5.0.0",
+    "ioredis": "^5.8.2"
+  }
+}
