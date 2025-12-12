@@ -263,29 +263,132 @@ async function main() {
   console.log(`   ✓ Created ${allUsers.length} users`);
 
   // ============================================
-  // 4. Create Admin Roles
+  // 4. Create Admin Roles with RBAC Permissions
   // ============================================
-  console.log('🔐 Creating admin roles...');
+  console.log('🔐 Creating admin roles with RBAC permissions...');
   const adminRoles: any[] = [];
-  const adminRoleTypes = [AdminRoleType.SUPER_ADMIN, AdminRoleType.ORG_ADMIN, AdminRoleType.DATA_OPS, AdminRoleType.AD_OPS, AdminRoleType.AUDITOR];
 
-  for (let i = 0; i < 5; i++) {
+  // 리소스 목록 정의
+  const allResources = ['tenant', 'experiment', 'rule', 'integration', 'audit', 'user', 'campaign', 'security', 'budget', 'settings'];
+  const allActions = ['create', 'read', 'update', 'delete', 'approve'];
+
+  // 역할별 권한 정의
+  const rolePermissions: Record<AdminRoleType, { resource: string; action: string; scope?: string }[]> = {
+    // SUPER_ADMIN: 모든 리소스에 대한 전체 권한
+    [AdminRoleType.SUPER_ADMIN]: allResources.flatMap(resource =>
+      allActions.map(action => ({ resource, action, scope: '*' }))
+    ),
+
+    // ORG_ADMIN: 조직 내 대부분의 관리 권한 (audit approve 제외)
+    [AdminRoleType.ORG_ADMIN]: [
+      { resource: 'tenant', action: 'read' },
+      { resource: 'tenant', action: 'update' },
+      { resource: 'experiment', action: 'create' },
+      { resource: 'experiment', action: 'read' },
+      { resource: 'experiment', action: 'update' },
+      { resource: 'experiment', action: 'delete' },
+      { resource: 'experiment', action: 'approve' },
+      { resource: 'rule', action: 'create' },
+      { resource: 'rule', action: 'read' },
+      { resource: 'rule', action: 'update' },
+      { resource: 'rule', action: 'delete' },
+      { resource: 'integration', action: 'create' },
+      { resource: 'integration', action: 'read' },
+      { resource: 'integration', action: 'update' },
+      { resource: 'integration', action: 'delete' },
+      { resource: 'user', action: 'create' },
+      { resource: 'user', action: 'read' },
+      { resource: 'user', action: 'update' },
+      { resource: 'user', action: 'delete' },
+      { resource: 'campaign', action: 'read' },
+      { resource: 'campaign', action: 'update' },
+      { resource: 'budget', action: 'read' },
+      { resource: 'budget', action: 'update' },
+      { resource: 'settings', action: 'read' },
+      { resource: 'settings', action: 'update' },
+      { resource: 'audit', action: 'read' },
+    ],
+
+    // DATA_OPS: 데이터 관련 권한
+    [AdminRoleType.DATA_OPS]: [
+      { resource: 'tenant', action: 'read' },
+      { resource: 'experiment', action: 'read' },
+      { resource: 'experiment', action: 'update' },
+      { resource: 'rule', action: 'read' },
+      { resource: 'integration', action: 'read' },
+      { resource: 'integration', action: 'update' },
+      { resource: 'campaign', action: 'read' },
+      { resource: 'audit', action: 'read' },
+      { resource: 'settings', action: 'read' },
+    ],
+
+    // AD_OPS: 광고 운영 관련 권한
+    [AdminRoleType.AD_OPS]: [
+      { resource: 'tenant', action: 'read' },
+      { resource: 'experiment', action: 'read' },
+      { resource: 'rule', action: 'create' },
+      { resource: 'rule', action: 'read' },
+      { resource: 'rule', action: 'update' },
+      { resource: 'rule', action: 'delete' },
+      { resource: 'campaign', action: 'create' },
+      { resource: 'campaign', action: 'read' },
+      { resource: 'campaign', action: 'update' },
+      { resource: 'campaign', action: 'delete' },
+      { resource: 'budget', action: 'read' },
+      { resource: 'budget', action: 'update' },
+      { resource: 'integration', action: 'read' },
+      { resource: 'audit', action: 'read' },
+    ],
+
+    // PRODUCT_OWNER: 실험 및 제품 관련 권한
+    [AdminRoleType.PRODUCT_OWNER]: [
+      { resource: 'tenant', action: 'read' },
+      { resource: 'experiment', action: 'create' },
+      { resource: 'experiment', action: 'read' },
+      { resource: 'experiment', action: 'update' },
+      { resource: 'experiment', action: 'approve' },
+      { resource: 'rule', action: 'read' },
+      { resource: 'campaign', action: 'read' },
+      { resource: 'integration', action: 'read' },
+      { resource: 'audit', action: 'read' },
+      { resource: 'settings', action: 'read' },
+    ],
+
+    // AUDITOR: 읽기 전용 감사 권한
+    [AdminRoleType.AUDITOR]: allResources.map(resource => ({ resource, action: 'read' })),
+  };
+
+  // 역할별 할당할 사용자 매핑
+  const roleUserMapping: { roleType: AdminRoleType; userIndex: number; description: string }[] = [
+    { roleType: AdminRoleType.SUPER_ADMIN, userIndex: 0, description: '최고 관리자 - 전체 시스템 관리' },
+    { roleType: AdminRoleType.ORG_ADMIN, userIndex: 1, description: '조직 관리자 - 조직 내 리소스 관리' },
+    { roleType: AdminRoleType.DATA_OPS, userIndex: 2, description: '데이터 운영 - 데이터 파이프라인 관리' },
+    { roleType: AdminRoleType.AD_OPS, userIndex: 5, description: '광고 운영 - 캠페인 및 예산 관리' },
+    { roleType: AdminRoleType.PRODUCT_OWNER, userIndex: 6, description: '제품 담당자 - 실험 및 기능 관리' },
+    { roleType: AdminRoleType.AUDITOR, userIndex: 3, description: '감사자 - 읽기 전용 접근' },
+  ];
+
+  for (const mapping of roleUserMapping) {
+    const permissions = rolePermissions[mapping.roleType];
+    
     const adminRole = await prisma.adminRole.create({
       data: {
-        userId: allUsers[i].id,
-        roleType: adminRoleTypes[i],
+        userId: allUsers[mapping.userIndex].id,
+        roleType: mapping.roleType,
+        grantedBy: mapping.roleType === AdminRoleType.SUPER_ADMIN ? 'SYSTEM' : allUsers[0].id,
         permissions: {
-          create: [
-            { resource: 'tenant', action: 'read' },
-            { resource: 'experiment', action: 'read' },
-            { resource: 'experiment', action: i < 3 ? 'update' : 'read' },
-          ],
+          create: permissions.map(perm => ({
+            resource: perm.resource,
+            action: perm.action,
+            scope: perm.scope || null,
+          })),
         },
       },
     });
     adminRoles.push(adminRole);
+    console.log(`   ✓ ${mapping.roleType}: ${allUsers[mapping.userIndex].email} - ${mapping.description}`);
   }
-  console.log(`   ✓ Created ${adminRoles.length} admin roles`);
+  console.log(`   ✓ Created ${adminRoles.length} admin roles with detailed RBAC permissions`);
 
   // ============================================
   // 5. Create Experiments & Variations
@@ -1006,8 +1109,8 @@ async function main() {
     prisma.accessPolicy.create({ data: { policyType: 'ip_blacklist', ipRange: '0.0.0.0/0', description: '기본 차단', isActive: false } }),
   ]);
   await Promise.all([
-    prisma.apiKeyConfig.create({ data: { keyName: '프로덕션 API 키', apiKey: 'prod-api-key-xxxxx', permissions: ['read', 'write'], isActive: true } }),
-    prisma.apiKeyConfig.create({ data: { keyName: '테스트 API 키', apiKey: 'test-api-key-yyyyy', permissions: ['read'], isActive: true } }),
+    prisma.apiKeyConfig.create({ data: { keyName: '프로덕션 API 키', apiKey: `prod-api-key-${Date.now()}-${Math.random().toString(36).slice(2)}`, permissions: ['read', 'write'], isActive: true } }),
+    prisma.apiKeyConfig.create({ data: { keyName: '테스트 API 키', apiKey: `test-api-key-${Date.now()}-${Math.random().toString(36).slice(2)}`, permissions: ['read'], isActive: true } }),
   ]);
   console.log(`   ✓ Created ${accessPolicies.length} access policies`);
 

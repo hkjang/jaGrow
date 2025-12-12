@@ -46,7 +46,7 @@ export default function ExperimentsPage() {
   const fetchExperiments = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/experiments`, {
+      const response = await fetch('/api/experiments', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.ok) {
@@ -103,7 +103,7 @@ export default function ExperimentsPage() {
       const token = localStorage.getItem('token');
       
       if (modalMode === 'create') {
-        const response = await fetch(`${API_URL}/experiments`, {
+        const response = await fetch('/api/experiments', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -128,7 +128,7 @@ export default function ExperimentsPage() {
           setExperiments([...experiments, newExp]);
         }
       } else if (editingExp) {
-        const response = await fetch(`${API_URL}/experiments/${editingExp.id}`, {
+        const response = await fetch(`/api/experiments/${editingExp.id}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -180,7 +180,7 @@ export default function ExperimentsPage() {
   const handleDelete = async (id: string) => {
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${API_URL}/experiments/${id}`, {
+      await fetch(`/api/experiments/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

@@ -39,7 +39,10 @@ export default function SecurityPage() {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_URL}/admin/security/alerts`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        }
       });
       if (response.ok) {
         const data = await response.json();

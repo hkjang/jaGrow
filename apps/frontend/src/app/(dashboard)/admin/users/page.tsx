@@ -14,7 +14,6 @@ interface User {
   lastLoginAt?: string;
 }
 
-const API_URL = 'http://localhost:4000';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -42,7 +41,7 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/users`, {
+      const response = await fetch('/api/users', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.ok) {
@@ -98,7 +97,7 @@ export default function UsersPage() {
       const token = localStorage.getItem('token');
       
       if (modalMode === 'create') {
-        const response = await fetch(`${API_URL}/users`, {
+        const response = await fetch('/api/users', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -125,7 +124,7 @@ export default function UsersPage() {
           setUsers([...users, newUser]);
         }
       } else if (editingUser) {
-        const response = await fetch(`${API_URL}/users/${editingUser.id}`, {
+        const response = await fetch(`/api/users/${editingUser.id}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -179,7 +178,7 @@ export default function UsersPage() {
   const handleDelete = async (id: string) => {
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${API_URL}/users/${id}`, {
+      await fetch(`/api/users/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

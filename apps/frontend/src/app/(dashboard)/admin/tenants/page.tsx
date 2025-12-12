@@ -14,7 +14,6 @@ interface Tenant {
   createdAt: string;
 }
 
-const API_URL = 'http://localhost:4000';
 
 export default function TenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -37,7 +36,7 @@ export default function TenantsPage() {
   const fetchTenants = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/admin/tenants`, {
+      const response = await fetch('/api/admin/tenants', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.ok) {
@@ -89,7 +88,7 @@ export default function TenantsPage() {
       const token = localStorage.getItem('token');
       
       if (modalMode === 'create') {
-        const response = await fetch(`${API_URL}/admin/tenants`, {
+        const response = await fetch('/api/admin/tenants', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -117,7 +116,7 @@ export default function TenantsPage() {
           setTenants([...tenants, newTenant]);
         }
       } else if (editingTenant) {
-        const response = await fetch(`${API_URL}/admin/tenants/${editingTenant.id}`, {
+        const response = await fetch(`/api/admin/tenants/${editingTenant.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -172,7 +171,7 @@ export default function TenantsPage() {
   const handleDelete = async (id: string) => {
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${API_URL}/admin/tenants/${id}`, {
+      await fetch(`/api/admin/tenants/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

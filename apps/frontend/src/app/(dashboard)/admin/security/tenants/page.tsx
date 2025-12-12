@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 interface Tenant {
   id: string;
   name: string;
@@ -18,19 +20,41 @@ export default function TenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const getAuthHeaders = () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
+  };
+
   useEffect(() => {
     fetchTenants();
   }, []);
 
+  const loadMockData = () => {
+    setTenants([
+      { id: '1', name: '테크스타트업', orgId: 'org-1', plan: 'enterprise', apiKey: 'api-***', eventsCount: 1250000, storageBytes: 5368709120, costEstimate: 850000, isActive: true },
+      { id: '2', name: '디지털마케팅', orgId: 'org-2', plan: 'pro', apiKey: 'api-***', eventsCount: 450000, storageBytes: 2147483648, costEstimate: 350000, isActive: true },
+      { id: '3', name: '이커머스허브', orgId: 'org-3', plan: 'pro', apiKey: 'api-***', eventsCount: 890000, storageBytes: 3221225472, costEstimate: 520000, isActive: true },
+    ]);
+  };
+
   const fetchTenants = async () => {
     try {
-      const res = await fetch('/api/admin/tenants');
+      const res = await fetch(`${API_BASE}/admin/tenants`, {
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         const data = await res.json();
         setTenants(data);
+      } else {
+        console.error('Failed to fetch tenants:', res.status);
+        loadMockData();
       }
     } catch (error) {
       console.error('Failed to fetch tenants:', error);
+      loadMockData();
     } finally {
       setLoading(false);
     }

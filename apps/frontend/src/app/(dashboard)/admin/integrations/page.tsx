@@ -14,7 +14,6 @@ interface Integration {
   isActive: boolean;
 }
 
-const API_URL = 'http://localhost:4000';
 
 const platforms = [
   { id: 'google', name: 'Google Ads', icon: '🔍' },
@@ -47,7 +46,7 @@ export default function IntegrationsPage() {
   const fetchIntegrations = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/admin/integrations`, {
+      const response = await fetch('/api/admin/integrations', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.ok) {

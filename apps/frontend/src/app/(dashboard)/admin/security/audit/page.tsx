@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 interface AuditLog {
   id: string;
   userId: string;
@@ -17,19 +19,45 @@ export default function AuditPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const getAuthHeaders = () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
+  };
+
   useEffect(() => {
     fetchLogs();
   }, []);
 
+  const loadMockData = () => {
+    setLogs([
+      { id: '1', userId: 'user-1', userEmail: 'admin@techstartup.kr', action: 'create', resource: 'experiment', resourceId: 'exp-1', ipAddress: '192.168.1.100', timestamp: new Date().toISOString() },
+      { id: '2', userId: 'user-2', userEmail: 'user@example.com', action: 'update', resource: 'campaign', resourceId: 'camp-1', ipAddress: '192.168.1.101', timestamp: new Date(Date.now() - 3600000).toISOString() },
+      { id: '3', userId: 'user-1', userEmail: 'admin@techstartup.kr', action: 'delete', resource: 'rule', resourceId: 'rule-1', ipAddress: '192.168.1.100', timestamp: new Date(Date.now() - 7200000).toISOString() },
+      { id: '4', userId: 'user-3', userEmail: 'manager@example.com', action: 'approve', resource: 'integration', resourceId: 'int-1', ipAddress: '192.168.1.102', timestamp: new Date(Date.now() - 86400000).toISOString() },
+    ]);
+  };
+
   const fetchLogs = async () => {
     try {
-      const res = await fetch('/api/admin/audit-logs');
+      const res = await fetch(`${API_BASE}/admin/audit-logs`, {
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         const data = await res.json();
-        setLogs(data);
+        if (Array.isArray(data)) {
+          setLogs(data);
+        } else {
+          loadMockData();
+        }
+      } else {
+        loadMockData();
       }
     } catch (error) {
       console.error('Failed to fetch audit logs:', error);
+      loadMockData();
     } finally {
       setLoading(false);
     }

@@ -17,7 +17,7 @@ export class TenantService {
   }
 
   async findAll() {
-    return this.prisma.tenant.findMany({
+    const tenants = await this.prisma.tenant.findMany({
       include: {
         integrationStatuses: {
           select: {
@@ -34,6 +34,13 @@ export class TenantService {
         },
       },
     });
+
+    // Convert BigInt to Number for JSON serialization
+    return tenants.map(tenant => ({
+      ...tenant,
+      eventsCount: Number(tenant.eventsCount),
+      storageBytes: Number(tenant.storageBytes),
+    }));
   }
 
   async findOne(id: string) {

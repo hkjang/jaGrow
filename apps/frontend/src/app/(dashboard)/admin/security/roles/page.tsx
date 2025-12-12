@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 interface AdminRole {
   id: string;
   userId: string;
@@ -9,6 +11,7 @@ interface AdminRole {
   grantedAt: string;
   expiresAt: string | null;
   isActive: boolean;
+  permissions?: { resource: string; action: string }[];
 }
 
 const roleDescriptions: Record<string, string> = {
@@ -28,12 +31,24 @@ export default function RolesPage() {
     fetchRoles();
   }, []);
 
+  const getAuthHeaders = () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
+  };
+
   const fetchRoles = async () => {
     try {
-      const res = await fetch('/api/admin/roles');
+      const res = await fetch(`${API_BASE}/admin/roles`, {
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         const data = await res.json();
         setRoles(data);
+      } else {
+        console.error('Failed to fetch roles:', res.status);
       }
     } catch (error) {
       console.error('Failed to fetch roles:', error);

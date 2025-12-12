@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/context/auth-context';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 
 const adminNavItems = [
@@ -73,16 +73,34 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.push('/login');
     }
   }, [user, isLoading, router]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setProfileDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  };
 
   if (isLoading) {
     return (
@@ -120,6 +138,17 @@ export default function AdminLayout({
               </div>
             )}
           </div>
+        </div>
+
+        {/* Dashboard Link */}
+        <div className="p-4 border-b border-slate-700">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-blue-600/20 transition-all duration-200"
+          >
+            <span className="text-lg">🏠</span>
+            {!sidebarCollapsed && <span className="text-sm font-medium">사용자 대시보드로 이동</span>}
+          </Link>
         </div>
 
         {/* Navigation */}
@@ -172,24 +201,116 @@ export default function AdminLayout({
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Top Header */}
-        <header className="h-16 bg-slate-800/50 backdrop-blur-xl border-b border-slate-700 flex items-center justify-between px-6">
+        <header className="h-16 bg-slate-800/50 backdrop-blur-xl border-b border-slate-700 flex items-center justify-between px-6 relative z-50">
           <div className="flex items-center gap-4">
             <h2 className="text-lg font-semibold text-white">
               {adminNavItems.flatMap(s => s.items).find(i => i.href === pathname)?.name || 'Admin'}
             </h2>
           </div>
           <div className="flex items-center gap-4">
-            <button className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
+            {/* Dashboard Quick Link */}
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <span>🏠</span>
+              <span>대시보드</span>
+            </Link>
+
+            {/* Notifications */}
+            <button className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors relative">
               🔔
+              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
             </button>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-sm font-bold text-white">
-                {user.email?.[0]?.toUpperCase() || 'A'}
-              </div>
-              <div className="text-sm">
-                <p className="text-white font-medium">{user.email}</p>
-                <p className="text-slate-400 text-xs">{user.role || 'Admin'}</p>
-              </div>
+
+            {/* Profile Dropdown */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-slate-700 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-sm font-bold text-white">
+                  {user.email?.[0]?.toUpperCase() || 'A'}
+                </div>
+                <div className="text-sm text-left">
+                  <p className="text-white font-medium">{user.name || user.email}</p>
+                  <p className="text-slate-400 text-xs">{user.role || 'Admin'}</p>
+                </div>
+                <span className="text-slate-400 text-xs">{profileDropdownOpen ? '▲' : '▼'}</span>
+              </button>
+
+              {/* Dropdown Menu */}
+              {profileDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[9999] overflow-hidden">
+                  {/* User Info Header */}
+                  <div className="p-4 bg-slate-700/50 border-b border-slate-700">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-lg font-bold text-white">
+                        {user.email?.[0]?.toUpperCase() || 'A'}
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">{user.name || 'Admin User'}</p>
+                        <p className="text-slate-400 text-xs">{user.email}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Menu Items */}
+                  <div className="py-2">
+                    <Link
+                      href="/dashboard"
+                      className="flex items-center gap-3 px-4 py-2.5 text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors"
+                      onClick={() => setProfileDropdownOpen(false)}
+                    >
+                      <span>🏠</span>
+                      <span>사용자 대시보드</span>
+                    </Link>
+                    <Link
+                      href="/settings/profile"
+                      className="flex items-center gap-3 px-4 py-2.5 text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors"
+                      onClick={() => setProfileDropdownOpen(false)}
+                    >
+                      <span>👤</span>
+                      <span>프로필 설정</span>
+                    </Link>
+                    <Link
+                      href="/settings/notifications"
+                      className="flex items-center gap-3 px-4 py-2.5 text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors"
+                      onClick={() => setProfileDropdownOpen(false)}
+                    >
+                      <span>🔔</span>
+                      <span>알림 설정</span>
+                    </Link>
+                    <Link
+                      href="/settings/security"
+                      className="flex items-center gap-3 px-4 py-2.5 text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors"
+                      onClick={() => setProfileDropdownOpen(false)}
+                    >
+                      <span>🔒</span>
+                      <span>보안 설정</span>
+                    </Link>
+                    <Link
+                      href="/help"
+                      className="flex items-center gap-3 px-4 py-2.5 text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors"
+                      onClick={() => setProfileDropdownOpen(false)}
+                    >
+                      <span>❓</span>
+                      <span>도움말</span>
+                    </Link>
+                  </div>
+
+                  {/* Logout */}
+                  <div className="border-t border-slate-700 py-2">
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+                    >
+                      <span>🚪</span>
+                      <span>로그아웃</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>

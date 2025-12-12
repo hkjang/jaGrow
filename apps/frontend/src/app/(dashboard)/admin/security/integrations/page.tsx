@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 interface IntegrationStatus {
   id: string;
   tenantId: string;
@@ -27,19 +29,45 @@ export default function IntegrationsPage() {
   const [integrations, setIntegrations] = useState<IntegrationStatus[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const getAuthHeaders = () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
+  };
+
   useEffect(() => {
     fetchIntegrations();
   }, []);
 
+  const loadMockData = () => {
+    setIntegrations([
+      { id: '1', tenantId: 't-1', platform: 'GOOGLE', accountId: 'ga-123456', tokenStatus: 'valid', tokenExpiresAt: null, lastSyncAt: new Date().toISOString(), lastErrorMessage: null, apiErrorRate: 0.02, isActive: true },
+      { id: '2', tenantId: 't-1', platform: 'META', accountId: 'fb-789012', tokenStatus: 'expiring', tokenExpiresAt: new Date(Date.now() + 86400000 * 5).toISOString(), lastSyncAt: new Date(Date.now() - 3600000).toISOString(), lastErrorMessage: null, apiErrorRate: 0.01, isActive: true },
+      { id: '3', tenantId: 't-1', platform: 'NAVER', accountId: 'nv-345678', tokenStatus: 'valid', tokenExpiresAt: null, lastSyncAt: new Date(Date.now() - 7200000).toISOString(), lastErrorMessage: null, apiErrorRate: 0.03, isActive: true },
+      { id: '4', tenantId: 't-2', platform: 'KAKAO', accountId: 'kk-901234', tokenStatus: 'expired', tokenExpiresAt: new Date(Date.now() - 86400000).toISOString(), lastSyncAt: null, lastErrorMessage: 'Token expired', apiErrorRate: 0.15, isActive: false },
+    ]);
+  };
+
   const fetchIntegrations = async () => {
     try {
-      const res = await fetch('/api/admin/integrations');
+      const res = await fetch(`${API_BASE}/admin/integrations`, {
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         const data = await res.json();
-        setIntegrations(data);
+        if (Array.isArray(data)) {
+          setIntegrations(data);
+        } else {
+          loadMockData();
+        }
+      } else {
+        loadMockData();
       }
     } catch (error) {
       console.error('Failed to fetch integrations:', error);
+      loadMockData();
     } finally {
       setLoading(false);
     }

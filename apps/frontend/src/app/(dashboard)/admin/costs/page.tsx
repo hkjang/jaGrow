@@ -48,7 +48,7 @@ export default function CostsPage() {
   const fetchQuotas = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/admin/costs/quotas`, {
+      const response = await fetch('/api/admin/costs/quotas', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.ok) {

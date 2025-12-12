@@ -16,19 +16,29 @@ export class AdminRoleGuard implements CanActivate {
       context.getClass(),
     ]);
 
+    console.log('[AdminRoleGuard] Required roles:', requiredRoles);
+
     if (!requiredRoles || requiredRoles.length === 0) {
+      console.log('[AdminRoleGuard] No roles required, allowing access');
       return true;
     }
 
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
+    console.log('[AdminRoleGuard] User from request:', user);
+
     if (!user || !user.id) {
+      console.log('[AdminRoleGuard] No user or user.id, denying access');
       return false;
     }
 
     const effectiveRoles = await this.rbacService.getEffectiveRoles(user.id);
+    console.log('[AdminRoleGuard] Effective roles for user', user.id, ':', effectiveRoles);
 
-    return requiredRoles.some((role) => effectiveRoles.includes(role));
+    const hasAccess = requiredRoles.some((role) => effectiveRoles.includes(role));
+    console.log('[AdminRoleGuard] Has access:', hasAccess);
+    
+    return hasAccess;
   }
 }
