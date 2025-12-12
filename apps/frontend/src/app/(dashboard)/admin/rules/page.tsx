@@ -14,7 +14,7 @@ interface Rule {
   triggerCount: number;
 }
 
-const API_URL = 'http://localhost:4000';
+
 
 export default function RulesPage() {
   const [rules, setRules] = useState<Rule[]>([]);
@@ -42,7 +42,7 @@ export default function RulesPage() {
   const fetchRules = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/admin/rules`, {
+      const response = await fetch('/api/admin/rules', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.ok) {

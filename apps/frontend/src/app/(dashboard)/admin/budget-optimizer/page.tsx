@@ -27,7 +27,7 @@ export default function BudgetOptimizerPage() {
 
   const fetchAllocations = async () => {
     try {
-      const res = await fetch('/api/ad-integration/budget-allocations');
+      const res = await fetch('/api/ad-connect/budget-allocations');
       if (res.ok) {
         const data = await res.json();
         setAllocations(data);

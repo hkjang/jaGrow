@@ -20,7 +20,7 @@ export default function DashboardTemplatesPage() {
 
   const fetchTemplates = async () => {
     try {
-      const res = await fetch('/api/settings/reports/templates');
+      const res = await fetch('/api/settings/reports/dashboard-templates');
       if (res.ok) {
         const data = await res.json();
         setTemplates(data);

@@ -62,6 +62,25 @@ export class AdConnectController {
     });
   }
 
+  @Get('campaigns')
+  async getCampaigns(@Query('organizationId') organizationId?: string) {
+    return this.prisma.adCampaign.findMany({
+      where: organizationId ? { adAccount: { organizationId } } : {},
+      include: { adAccount: { select: { platform: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    });
+  }
+
+  @Get('budget-allocations')
+  async getBudgetAllocations(@Query('adAccountId') adAccountId?: string) {
+    return this.prisma.budgetAllocation.findMany({
+      where: adAccountId ? { adAccountId } : {},
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    });
+  }
+
   @Delete('accounts/:id')
   async disconnectAccount(@Param('id') id: string) {
     // Soft delete or hard delete? 'isActive: false' is better.

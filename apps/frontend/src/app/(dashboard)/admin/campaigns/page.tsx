@@ -21,7 +21,7 @@ export default function CampaignsPage() {
 
   const fetchCampaigns = async () => {
     try {
-      const res = await fetch('/api/ad-integration/campaigns');
+      const res = await fetch('/api/ad-connect/campaigns');
       if (res.ok) {
         const data = await res.json();
         setCampaigns(data);

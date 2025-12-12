@@ -90,6 +90,14 @@ export class AIModelSettingsService {
     });
   }
 
+  async findAllValidations(tenantId?: string) {
+    return this.prisma.aIModelValidation.findMany({
+      include: { modelConfig: { select: { modelType: true, modelVersion: true, provider: true } } },
+      orderBy: { validatedAt: 'desc' },
+      take: 100
+    });
+  }
+
   async findLatestValidation(modelConfigId: string) {
     return this.prisma.aIModelValidation.findFirst({
       where: { modelConfigId },

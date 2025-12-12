@@ -21,7 +21,7 @@ export default function ReportsPage() {
 
   const fetchReports = async () => {
     try {
-      const res = await fetch('/api/settings/reports');
+      const res = await fetch('/api/settings/reports/kpis');
       if (res.ok) {
         const data = await res.json();
         setReports(data);

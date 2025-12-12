@@ -73,6 +73,11 @@ export class AIModelSettingsController {
     return this.service.createValidation(data);
   }
 
+  @Get('validations')
+  async findAllValidations(@Query('tenantId') tenantId?: string) {
+    return this.service.findAllValidations(tenantId);
+  }
+
   @Get('configs/:modelConfigId/validations')
   async findValidationsByModelId(@Param('modelConfigId') modelConfigId: string) {
     return this.service.findValidationsByModelId(modelConfigId);
