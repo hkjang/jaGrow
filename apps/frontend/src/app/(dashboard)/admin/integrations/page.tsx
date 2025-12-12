@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 interface Integration {
   id: string;
   platform: string;
@@ -24,7 +26,8 @@ const platforms = [
 ];
 
 const platformIcons: Record<string, string> = {
-  'Google Ads': '🔍', 'Meta': '📘', 'TikTok': '🎵', 'Naver': '🇰🇷', 'Kakao': '💬'
+  'Google Ads': '🔍', 'Meta': '📘', 'TikTok': '🎵', 'Naver': '🇰🇷', 'Kakao': '💬',
+  'GOOGLE': '🔍', 'META': '📘', 'TIKTOK': '🎵', 'NAVER': '🇰🇷', 'KAKAO': '💬'
 };
 
 export default function IntegrationsPage() {
@@ -39,19 +42,30 @@ export default function IntegrationsPage() {
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
+  const getAuthHeaders = () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
+  };
+
   useEffect(() => {
     fetchIntegrations();
   }, []);
 
   const fetchIntegrations = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/integrations', {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await fetch(`${API_BASE}/admin/integrations`, {
+        headers: getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
-        setIntegrations(data);
+        if (Array.isArray(data)) {
+          setIntegrations(data);
+        } else {
+          loadMockData();
+        }
       } else {
         loadMockData();
       }
@@ -69,7 +83,6 @@ export default function IntegrationsPage() {
       { id: '3', platform: 'Meta', accountId: 'fb_11111', accountName: 'Facebook Ads', tokenStatus: 'valid', tokenExpiresAt: '2025-01-30', lastSyncAt: '2 min ago', apiErrorRate: 0, isActive: true },
       { id: '4', platform: 'Meta', accountId: 'fb_22222', accountName: 'Instagram', tokenStatus: 'expired', tokenExpiresAt: '2024-11-10', lastSyncAt: 'N/A', apiErrorRate: 100, isActive: false },
       { id: '5', platform: 'TikTok', accountId: 'tt_33333', accountName: 'TikTok Business', tokenStatus: 'valid', tokenExpiresAt: '2025-03-01', lastSyncAt: '15 min ago', apiErrorRate: 0.5, isActive: true },
-      { id: '6', platform: 'Naver', accountId: 'nv_44444', accountName: 'Naver Ads', tokenStatus: 'valid', tokenExpiresAt: '2025-02-28', lastSyncAt: '1 hour ago', apiErrorRate: 0, isActive: true },
     ]);
   };
 
@@ -87,6 +100,38 @@ export default function IntegrationsPage() {
 
     setSaving(true);
     try {
+      const platformName = platforms.find(p => p.id === connectPlatform)?.name || connectPlatform;
+      
+      const response = await fetch(`${API_BASE}/admin/integrations`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          platform: platformName.toUpperCase().replace(' ', '_'),
+          accountId: formData.accountId,
+          accountName: formData.accountName
+        })
+      });
+
+      if (response.ok) {
+        fetchIntegrations(); // Refresh list
+      } else {
+        // Mock create for UI demo
+        const newIntegration: Integration = {
+          id: Date.now().toString(),
+          platform: platformName,
+          accountId: formData.accountId,
+          accountName: formData.accountName,
+          tokenStatus: 'valid',
+          tokenExpiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          lastSyncAt: 'Just now',
+          apiErrorRate: 0,
+          isActive: true
+        };
+        setIntegrations([...integrations, newIntegration]);
+      }
+      setShowConnectModal(false);
+    } catch (error) {
+      // Mock create for demo
       const newIntegration: Integration = {
         id: Date.now().toString(),
         platform: platforms.find(p => p.id === connectPlatform)?.name || connectPlatform,
@@ -105,7 +150,16 @@ export default function IntegrationsPage() {
     }
   };
 
-  const handleRefreshToken = (integration: Integration) => {
+  const handleRefreshToken = async (integration: Integration) => {
+    try {
+      await fetch(`${API_BASE}/admin/integrations/${integration.id}/refresh-token`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+    } catch (error) {
+      console.error('Failed to refresh token:', error);
+    }
+    // Update UI optimistically
     setIntegrations(integrations.map(i =>
       i.id === integration.id
         ? {
@@ -118,12 +172,32 @@ export default function IntegrationsPage() {
     ));
   };
 
-  const handleDisconnect = (id: string) => {
-    setIntegrations(integrations.filter(i => i.id !== id));
+  const handleDisconnect = async (id: string) => {
+    try {
+      const response = await fetch(`${API_BASE}/admin/integrations/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      if (response.ok) {
+        fetchIntegrations(); // Refresh list
+      } else {
+        setIntegrations(integrations.filter(i => i.id !== id));
+      }
+    } catch (error) {
+      setIntegrations(integrations.filter(i => i.id !== id));
+    }
     setShowDeleteConfirm(null);
   };
 
-  const handleSync = (integration: Integration) => {
+  const handleSync = async (integration: Integration) => {
+    try {
+      await fetch(`${API_BASE}/admin/integrations/${integration.id}/sync`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+    } catch (error) {
+      console.error('Failed to sync:', error);
+    }
     setIntegrations(integrations.map(i =>
       i.id === integration.id ? { ...i, lastSyncAt: 'Just now' } : i
     ));

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 interface Tenant {
   id: string;
   name: string;
@@ -14,7 +16,6 @@ interface Tenant {
   createdAt: string;
 }
 
-
 export default function TenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,9 +26,17 @@ export default function TenantsPage() {
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
-  const [formData, setFormData] = useState({ name: '', plan: 'free' });
+  const [formData, setFormData] = useState({ name: '', plan: 'free', orgId: '' });
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+
+  const getAuthHeaders = () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
+  };
 
   useEffect(() => {
     fetchTenants();
@@ -35,44 +44,45 @@ export default function TenantsPage() {
 
   const fetchTenants = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/tenants', {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await fetch(`${API_BASE}/admin/tenants`, {
+        headers: getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
-        setTenants(data);
+        if (Array.isArray(data)) {
+          setTenants(data);
+        } else {
+          loadMockData();
+        }
       } else {
-        // Use mock data if API fails
-        setTenants([
-          { id: '1', name: 'Acme Corporation', orgId: 'org_acme', plan: 'enterprise', eventsCount: 5420000, storageBytes: 2147483648, costEstimate: 1250.00, isActive: true, createdAt: '2024-01-15' },
-          { id: '2', name: 'StartupXYZ', orgId: 'org_xyz', plan: 'pro', eventsCount: 1230000, storageBytes: 536870912, costEstimate: 350.00, isActive: true, createdAt: '2024-02-20' },
-          { id: '3', name: 'TechGlobal', orgId: 'org_tech', plan: 'enterprise', eventsCount: 8750000, storageBytes: 4294967296, costEstimate: 2100.00, isActive: true, createdAt: '2024-01-08' },
-          { id: '4', name: 'LocalBiz', orgId: 'org_local', plan: 'free', eventsCount: 45000, storageBytes: 10485760, costEstimate: 0, isActive: true, createdAt: '2024-03-10' },
-        ]);
+        loadMockData();
       }
     } catch (error) {
       console.error('Failed to fetch tenants:', error);
-      // Use mock data as fallback
-      setTenants([
-        { id: '1', name: 'Acme Corporation', orgId: 'org_acme', plan: 'enterprise', eventsCount: 5420000, storageBytes: 2147483648, costEstimate: 1250.00, isActive: true, createdAt: '2024-01-15' },
-        { id: '2', name: 'StartupXYZ', orgId: 'org_xyz', plan: 'pro', eventsCount: 1230000, storageBytes: 536870912, costEstimate: 350.00, isActive: true, createdAt: '2024-02-20' },
-      ]);
+      loadMockData();
     } finally {
       setLoading(false);
     }
   };
 
+  const loadMockData = () => {
+    setTenants([
+      { id: '1', name: 'Acme Corporation', orgId: 'org_acme', plan: 'enterprise', eventsCount: 5420000, storageBytes: 2147483648, costEstimate: 1250.00, isActive: true, createdAt: '2024-01-15' },
+      { id: '2', name: 'StartupXYZ', orgId: 'org_xyz', plan: 'pro', eventsCount: 1230000, storageBytes: 536870912, costEstimate: 350.00, isActive: true, createdAt: '2024-02-20' },
+      { id: '3', name: 'TechGlobal', orgId: 'org_tech', plan: 'enterprise', eventsCount: 8750000, storageBytes: 4294967296, costEstimate: 2100.00, isActive: true, createdAt: '2024-01-08' },
+    ]);
+  };
+
   const openCreateModal = () => {
     setModalMode('create');
-    setFormData({ name: '', plan: 'free' });
+    setFormData({ name: '', plan: 'free', orgId: '' });
     setEditingTenant(null);
     setShowModal(true);
   };
 
   const openEditModal = (tenant: Tenant) => {
     setModalMode('edit');
-    setFormData({ name: tenant.name, plan: tenant.plan });
+    setFormData({ name: tenant.name, plan: tenant.plan, orgId: tenant.orgId });
     setEditingTenant(tenant);
     setShowModal(true);
   };
@@ -85,27 +95,26 @@ export default function TenantsPage() {
 
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
-      
       if (modalMode === 'create') {
-        const response = await fetch('/api/admin/tenants', {
+        const response = await fetch(`${API_BASE}/admin/tenants`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify(formData)
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            name: formData.name,
+            plan: formData.plan,
+            orgId: formData.orgId || `org_${formData.name.toLowerCase().replace(/\s/g, '_')}`
+          })
         });
         
         if (response.ok) {
-          const newTenant = await response.json();
-          setTenants([...tenants, newTenant]);
+          const result = await response.json();
+          fetchTenants(); // Refresh list
         } else {
-          // Mock create
+          // Mock create for UI demo
           const newTenant: Tenant = {
             id: Date.now().toString(),
             name: formData.name,
-            orgId: `org_${formData.name.toLowerCase().replace(/\s/g, '_')}`,
+            orgId: formData.orgId || `org_${formData.name.toLowerCase().replace(/\s/g, '_')}`,
             plan: formData.plan,
             eventsCount: 0,
             storageBytes: 0,
@@ -116,18 +125,14 @@ export default function TenantsPage() {
           setTenants([...tenants, newTenant]);
         }
       } else if (editingTenant) {
-        const response = await fetch(`/api/admin/tenants/${editingTenant.id}`, {
+        const response = await fetch(`${API_BASE}/admin/tenants/${editingTenant.id}`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify(formData)
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ name: formData.name, plan: formData.plan })
         });
         
         if (response.ok) {
-          const updatedTenant = await response.json();
-          setTenants(tenants.map(t => t.id === editingTenant.id ? updatedTenant : t));
+          fetchTenants(); // Refresh list
         } else {
           // Mock update
           setTenants(tenants.map(t => 
@@ -146,7 +151,7 @@ export default function TenantsPage() {
         const newTenant: Tenant = {
           id: Date.now().toString(),
           name: formData.name,
-          orgId: `org_${formData.name.toLowerCase().replace(/\s/g, '_')}`,
+          orgId: formData.orgId || `org_${formData.name.toLowerCase().replace(/\s/g, '_')}`,
           plan: formData.plan,
           eventsCount: 0,
           storageBytes: 0,
@@ -170,22 +175,33 @@ export default function TenantsPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`/api/admin/tenants/${id}`, {
+      const response = await fetch(`${API_BASE}/admin/tenants/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getAuthHeaders()
       });
+      if (response.ok) {
+        fetchTenants(); // Refresh list
+      } else {
+        setTenants(tenants.filter(t => t.id !== id));
+      }
     } catch (error) {
       console.error('Failed to delete tenant:', error);
+      setTenants(tenants.filter(t => t.id !== id));
     }
-    // Update UI regardless (will work even if API fails for demo)
-    setTenants(tenants.filter(t => t.id !== id));
     setShowDeleteConfirm(null);
   };
 
   const toggleActive = async (tenant: Tenant) => {
-    const updated = { ...tenant, isActive: !tenant.isActive };
-    setTenants(tenants.map(t => t.id === tenant.id ? updated : t));
+    try {
+      await fetch(`${API_BASE}/admin/tenants/${tenant.id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ isActive: !tenant.isActive })
+      });
+    } catch (error) {
+      console.error('Failed to toggle tenant status:', error);
+    }
+    setTenants(tenants.map(t => t.id === tenant.id ? { ...t, isActive: !t.isActive } : t));
   };
 
   const filteredTenants = tenants.filter(t => {
